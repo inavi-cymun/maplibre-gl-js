@@ -29,10 +29,20 @@
           sources: {
             osm: {
               type: 'raster',
-              tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tiles: ['http://61.33.249.243:25004/maps/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=InaviSatellite&STYLE=default&FORMAT=image/png&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}'],
               tileSize: 256,
-              attribution: '&copy; OpenStreetMap Contributors',
-              maxzoom: 19,
+              maxzoom: 17,
+            },
+            // Use a different source for terrain and hillshade layers, to improve render quality
+            terrainSource: {
+              type: 'raster-dem',
+              url: 'http://10.10.82.42:24003/mapbox_mvt/2304/tile.json',
+              tileSize: 256,
+            },
+            hillshadeSource: {
+              type: 'raster-dem',
+              url: 'http://10.10.82.42:24003/mapbox_mvt/2304/tile.json',
+              tileSize: 256,
             },
           },
           layers: [
@@ -42,13 +52,17 @@
               source: 'osm',
             },
           ],
+          terrain: {
+            source: 'terrainSource',
+            exaggeration: 1,
+          },
         },
-        maxZoom: 18,
+        maxZoom: 25,
         maxPitch: 85,
       });
 
       async function loadLASData() {
-        const response = await fetch('./copcWgs84.geojson');
+        const response = await fetch('../data/copcWgs84.geojson');
         const featureCollection = await response.json();
         const features = featureCollection.features;
         const featuresLength = features.length;
@@ -59,26 +73,29 @@
           const pointX = features[i].geometry.coordinates[0];
           const pointY = features[i].geometry.coordinates[1];
           const pointZ = features[i].geometry.coordinates[2];
-          
+
           const polygonVertices = [
-            [pointX - 0.000002, pointY - 0.000002],
-            [pointX - 0.000002, pointY + 0.000002],
-            [pointX + 0.000002, pointY + 0.000002],
-            [pointX + 0.000002, pointY - 0.000002],
-            [pointX - 0.000002, pointY - 0.000002],
+            [pointX - 0.0000015, pointY - 0.0000015],
+            [pointX - 0.0000015, pointY + 0.0000015],
+            [pointX + 0.0000015, pointY + 0.0000015],
+            [pointX + 0.0000015, pointY - 0.0000015],
+            [pointX - 0.0000015, pointY - 0.0000015],
           ];
 
-          features[i].properties.z_top = pointZ + 0.2;
-          features[i].properties.z_base = pointZ - 0.2;
+          features[i].properties.z_top = pointZ + 0.15;
+          features[i].properties.z_base = pointZ - 0.15;
           features[i].properties.color = 'gray';
           features[i].geometry.coordinates = [polygonVertices];
           result.push(features[i]);
         }
 
-        return result;
+        return features;
       }
 
       map.on('load', function () {
+        map.showTileBoundaries=true
+        //map.showOverdrawInspector=true
+        map.showCollisionBoxes=true
         loadLASData().then((lasData) => {
           map.addLayer({
             id: 'polygon-data',

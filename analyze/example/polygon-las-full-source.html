@@ -69,7 +69,7 @@
       async function loadLASData(lengthOfLayer) {
         if(response ==null && arrayBuffer==null){
           console.time('get');
-          response = await fetch('./output.las');
+          response = await fetch('../data/output.las');
           arrayBuffer = await response.arrayBuffer();
           console.timeEnd('get');
         }
@@ -155,11 +155,11 @@
       }
 
       map.on('load', function () {
-        
+        map.showTileBoundaries=true
       });
       map.on('idle', (e) => {
         console.log('idle')
-        if(start<15){
+        if(start<10){
           console.log(start*100000)
           loadLASData(start+1,start).then((lasData) => {
             for (let i = 0; i < 1; i++) {

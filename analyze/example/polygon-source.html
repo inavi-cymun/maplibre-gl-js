@@ -43,7 +43,7 @@
             },
           ],
         },
-        maxZoom: 18,
+        maxZoom: 19,
         maxPitch: 85,
       });
 
@@ -54,45 +54,26 @@
             type: 'Polygon',
             coordinates: [
               [
-                [127.1098, 37.386],
+                [127.1098, 37.3858],
                 [127.1098, 37.3859],
-                [127.1099, 37.3859],
-                [127.1098, 37.386],
+                [127.10992, 37.3859],
+                [127.10992, 37.3858],
+                [127.1098, 37.3858],
               ],
             ],
           },
           properties: {
-            level: 1,
-            name: 'Bird Exhibit',
             z_top: 40,
             z_base: 30,
-            color: 'orange',
+            color: 'gray',
           },
-        },
-        {
-          type: 'Feature',
-          geometry: {
-            type: 'Polygon',
-            coordinates: [
-              [
-                [127.10965, 37.386],
-                [127.10965, 37.3859],
-                [127.10975, 37.3859],
-                [127.10965, 37.386],
-              ],
-            ],
-          },
-          properties: {
-            level: 1,
-            name: 'Bird Exhibit',
-            z_top: 20,
-            z_base: 10,
-            color: 'orange',
-          },
-        },
+        }
       ];
 
       map.on('load', function () {
+        map.showTileBoundaries=true
+        //map.showOverdrawInspector=true
+        map.showCollisionBoxes=true
         map.addLayer({
           id: 'polygon-data',
           type: 'fill-extrusion',

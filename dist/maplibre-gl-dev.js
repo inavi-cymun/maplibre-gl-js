@@ -13902,7 +13902,7 @@ class LineStripIndexArray extends StructArrayLayout1ui2 {
 }
 
 const layout$6 = createLayout([
-    { name: 'a_pos', components: 2, type: 'Int16' }
+    { name: 'a_pos', components: 3, type: 'Int16' }
 ], 4);
 const { members: members$4, size: size$4, alignment: alignment$4 } = layout$6;
 
@@ -15033,7 +15033,7 @@ class CircleBucket {
                 this.indexArray.emplaceBack(index, index + 3, index + 2);
                 segment.vertexLength += 4;
                 segment.primitiveLength += 2;
-                debugger; //circle_bucket.addFeature
+                //debugger; //circle_bucket.addFeature
             }
         }
         this.programConfigurations.populatePaintArrays(this.layoutVertexArray.length, feature, index, {}, canonical);
@@ -31547,7 +31547,7 @@ class WorkerTile {
                     sourceLayerIndex,
                     sourceID: this.source
                 });
-                debugger;//bucket.populate
+                //debugger;//bucket.populate
                 bucket.populate(features, options, this.tileID.canonical);
                 featureIndex.bucketLayerIDs.push(family.map((l) => l.id));
             }
@@ -32831,7 +32831,7 @@ function convertPoint(coords, out) {
     out.push(projectX(coords[0]));
     out.push(projectY(coords[1]));
     out.push(coords[2]);
-    debugger;//convertPoint
+    //debugger;//convertPoint
 }
 
 function convertLine(ring, out, tolerance, isPolygon) {
@@ -33172,7 +33172,7 @@ function transformTile(tile, extent) {
             type = feature.type;
 
         feature.geometry = [];
-        debugger;//transformTile
+        //debugger;//transformTile
         if (type === 1) {
             for (j = 0; j < geom.length; j += 2) {
                 feature.geometry.push(transformPoint(geom[j], geom[j + 1], extent, z2, tx, ty, geom[j + 2]));
@@ -33194,7 +33194,7 @@ function transformTile(tile, extent) {
 }
 
 function transformPoint(x, y, extent, z2, tx, ty,z) {
-    debugger;//transformPoint
+    //debugger;//transformPoint
     return [
         Math.round(extent * (x * z2 - tx)),
         Math.round(extent * (y * z2 - ty)),
@@ -42813,7 +42813,7 @@ var backgroundPatternVert = 'uniform mat4 u_matrix;uniform vec2 u_pattern_size_a
 var circleFrag = 'varying vec3 v_data;varying float v_visibility;\n#pragma mapbox: define highp vec4 color\n#pragma mapbox: define mediump float radius\n#pragma mapbox: define lowp float blur\n#pragma mapbox: define lowp float opacity\n#pragma mapbox: define highp vec4 stroke_color\n#pragma mapbox: define mediump float stroke_width\n#pragma mapbox: define lowp float stroke_opacity\nvoid main() {\n#pragma mapbox: initialize highp vec4 color\n#pragma mapbox: initialize mediump float radius\n#pragma mapbox: initialize lowp float blur\n#pragma mapbox: initialize lowp float opacity\n#pragma mapbox: initialize highp vec4 stroke_color\n#pragma mapbox: initialize mediump float stroke_width\n#pragma mapbox: initialize lowp float stroke_opacity\nvec2 extrude=v_data.xy;float extrude_length=length(extrude);lowp float antialiasblur=v_data.z;float antialiased_blur=-max(blur,antialiasblur);float opacity_t=smoothstep(0.0,antialiased_blur,extrude_length-1.0);float color_t=stroke_width < 0.01 ? 0.0 : smoothstep(antialiased_blur,0.0,extrude_length-radius/(radius+stroke_width));gl_FragColor=v_visibility*opacity_t*mix(color*opacity,stroke_color*stroke_opacity,color_t);\n#ifdef OVERDRAW_INSPECTOR\ngl_FragColor=vec4(1.0);\n#endif\n}';
 
 // This file is generated. Edit build/generate-shaders.ts, then run `npm run codegen`.
-var circleVert = 'uniform mat4 u_matrix;uniform bool u_scale_with_map;uniform bool u_pitch_with_map;uniform vec2 u_extrude_scale;uniform lowp float u_device_pixel_ratio;uniform highp float u_camera_to_center_distance;attribute vec2 a_pos;varying vec3 v_data;varying float v_visibility;\n#pragma mapbox: define highp vec4 color\n#pragma mapbox: define mediump float radius\n#pragma mapbox: define lowp float blur\n#pragma mapbox: define lowp float opacity\n#pragma mapbox: define highp vec4 stroke_color\n#pragma mapbox: define mediump float stroke_width\n#pragma mapbox: define lowp float stroke_opacity\nvoid main(void) {\n#pragma mapbox: initialize highp vec4 color\n#pragma mapbox: initialize mediump float radius\n#pragma mapbox: initialize lowp float blur\n#pragma mapbox: initialize lowp float opacity\n#pragma mapbox: initialize highp vec4 stroke_color\n#pragma mapbox: initialize mediump float stroke_width\n#pragma mapbox: initialize lowp float stroke_opacity\nvec2 extrude=vec2(mod(a_pos,2.0)*2.0-1.0);vec2 circle_center=floor(a_pos*0.5);float ele=get_elevation(circle_center);v_visibility=calculate_visibility(u_matrix*vec4(circle_center,ele,1.0));if (u_pitch_with_map) {vec2 corner_position=circle_center;if (u_scale_with_map) {corner_position+=extrude*(radius+stroke_width)*u_extrude_scale;} else {vec4 projected_center=u_matrix*vec4(circle_center,0,1);corner_position+=extrude*(radius+stroke_width)*u_extrude_scale*(projected_center.w/u_camera_to_center_distance);}gl_Position=u_matrix*vec4(corner_position,ele,1);} else {gl_Position=u_matrix*vec4(circle_center,ele,1);if (u_scale_with_map) {gl_Position.xy+=extrude*(radius+stroke_width)*u_extrude_scale*u_camera_to_center_distance;} else {gl_Position.xy+=extrude*(radius+stroke_width)*u_extrude_scale*gl_Position.w;}}lowp float antialiasblur=1.0/u_device_pixel_ratio/(radius+stroke_width);v_data=vec3(extrude.x,extrude.y,antialiasblur);}';
+var circleVert = 'uniform mat4 u_matrix;uniform bool u_scale_with_map;uniform bool u_pitch_with_map;uniform vec2 u_extrude_scale;uniform lowp float u_device_pixel_ratio;uniform highp float u_camera_to_center_distance;attribute vec3 a_pos;varying vec3 v_data;varying float v_visibility;\n#pragma mapbox: define highp vec4 color\n#pragma mapbox: define mediump float radius\n#pragma mapbox: define lowp float blur\n#pragma mapbox: define lowp float opacity\n#pragma mapbox: define highp vec4 stroke_color\n#pragma mapbox: define mediump float stroke_width\n#pragma mapbox: define lowp float stroke_opacity\nvoid main(void) {\n#pragma mapbox: initialize highp vec4 color\n#pragma mapbox: initialize mediump float radius\n#pragma mapbox: initialize lowp float blur\n#pragma mapbox: initialize lowp float opacity\n#pragma mapbox: initialize highp vec4 stroke_color\n#pragma mapbox: initialize mediump float stroke_width\n#pragma mapbox: initialize lowp float stroke_opacity\nvec2 extrude=vec2(mod(a_pos.xy,2.0)*2.0-1.0);vec2 circle_center=floor(a_pos.xy*0.5);float ele=get_elevation(circle_center)+a_pos.z;v_visibility=1.0;if (u_pitch_with_map) {vec2 corner_position=circle_center;if (u_scale_with_map) {corner_position+=extrude*(radius+stroke_width)*u_extrude_scale;} else {vec4 projected_center=u_matrix*vec4(circle_center,0,1);corner_position+=extrude*(radius+stroke_width)*u_extrude_scale*(projected_center.w/u_camera_to_center_distance);}gl_Position=u_matrix*vec4(corner_position,ele,1);} else {gl_Position=u_matrix*vec4(circle_center,ele,1);if (u_scale_with_map) {gl_Position.xy+=extrude*(radius+stroke_width)*u_extrude_scale*u_camera_to_center_distance;} else {gl_Position.xy+=extrude*(radius+stroke_width)*u_extrude_scale*gl_Position.w;}}lowp float antialiasblur=1.0/u_device_pixel_ratio/(radius+stroke_width);v_data=vec3(extrude.x,extrude.y,antialiasblur);}';
 
 // This file is generated. Edit build/generate-shaders.ts, then run `npm run codegen`.
 var clippingMaskFrag = 'void main() {gl_FragColor=vec4(1.0);}';

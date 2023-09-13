@@ -85,9 +85,10 @@ var pointGeometry = Point$1;
  * @example
  * var point = new Point(-77, 38);
  */
-function Point$1(x, y) {
+function Point$1(x, y, z ) {
     this.x = x;
     this.y = y;
+    this.z = z;
 }
 
 Point$1.prototype = {
@@ -14914,8 +14915,8 @@ function toEvaluationFeature(feature, needGeometry) {
         geometry: needGeometry ? loadGeometry(feature) : [] };
 }
 
-function addCircleVertex(layoutVertexArray, x, y, extrudeX, extrudeY) {
-    layoutVertexArray.emplaceBack((x * 2) + ((extrudeX + 1) / 2), (y * 2) + ((extrudeY + 1) / 2));
+function addCircleVertex(layoutVertexArray, x, y, extrudeX, extrudeY, z) {
+    layoutVertexArray.emplaceBack((x * 2) + ((extrudeX + 1) / 2), (y * 2) + ((extrudeY + 1) / 2), z);
 }
 /**
  * @internal
@@ -15010,6 +15011,7 @@ class CircleBucket {
             for (const point of ring) {
                 const x = point.x;
                 const y = point.y;
+                const z = point.z;
                 // Do not include points that are outside the tile boundaries.
                 if (x < 0 || x >= EXTENT || y < 0 || y >= EXTENT)
                     continue;
@@ -15023,10 +15025,10 @@ class CircleBucket {
                 // └─────────┘
                 const segment = this.segments.prepareSegment(4, this.layoutVertexArray, this.indexArray, feature.sortKey);
                 const index = segment.vertexLength;
-                addCircleVertex(this.layoutVertexArray, x, y, -1, -1);
-                addCircleVertex(this.layoutVertexArray, x, y, 1, -1);
-                addCircleVertex(this.layoutVertexArray, x, y, 1, 1);
-                addCircleVertex(this.layoutVertexArray, x, y, -1, 1);
+                addCircleVertex(this.layoutVertexArray, x, y, -1, -1,z);
+                addCircleVertex(this.layoutVertexArray, x, y, 1, -1,z);
+                addCircleVertex(this.layoutVertexArray, x, y, 1, 1,z);
+                addCircleVertex(this.layoutVertexArray, x, y, -1, 1,z);
                 this.indexArray.emplaceBack(index, index + 1, index + 2);
                 this.indexArray.emplaceBack(index, index + 3, index + 2);
                 segment.vertexLength += 4;
@@ -31921,7 +31923,7 @@ let FeatureWrapper$1 = class FeatureWrapper {
         if (this._feature.type === 1) {
             const geometry = [];
             for (const point of this._feature.geometry) {
-                geometry.push([new performance.Point(point[0], point[1])]);
+                geometry.push([new performance.Point(point[0], point[1], point[2])]);
             }
             return geometry;
         }
@@ -31930,7 +31932,7 @@ let FeatureWrapper$1 = class FeatureWrapper {
             for (const ring of this._feature.geometry) {
                 const newRing = [];
                 for (const point of ring) {
-                    newRing.push(new performance.Point(point[0], point[1]));
+                    newRing.push(new performance.Point(point[0], point[1], point[2]));
                 }
                 geometry.push(newRing);
             }
@@ -32828,7 +32830,8 @@ function convertFeature(features, geojson, options, index) {
 function convertPoint(coords, out) {
     out.push(projectX(coords[0]));
     out.push(projectY(coords[1]));
-    out.push(0);
+    out.push(coords[2]);
+    debugger;//convertPoint
 }
 
 function convertLine(ring, out, tolerance, isPolygon) {
@@ -33169,16 +33172,16 @@ function transformTile(tile, extent) {
             type = feature.type;
 
         feature.geometry = [];
-
+        debugger;//transformTile
         if (type === 1) {
             for (j = 0; j < geom.length; j += 2) {
-                feature.geometry.push(transformPoint(geom[j], geom[j + 1], extent, z2, tx, ty));
+                feature.geometry.push(transformPoint(geom[j], geom[j + 1], extent, z2, tx, ty, geom[j + 2]));
             }
         } else {
             for (j = 0; j < geom.length; j++) {
                 var ring = [];
                 for (k = 0; k < geom[j].length; k += 2) {
-                    ring.push(transformPoint(geom[j][k], geom[j][k + 1], extent, z2, tx, ty));
+                    ring.push(transformPoint(geom[j][k], geom[j][k + 1], extent, z2, tx, ty, geom[j][k+2]));
                 }
                 feature.geometry.push(ring);
             }
@@ -33190,10 +33193,12 @@ function transformTile(tile, extent) {
     return tile;
 }
 
-function transformPoint(x, y, extent, z2, tx, ty) {
+function transformPoint(x, y, extent, z2, tx, ty,z) {
+    debugger;//transformPoint
     return [
         Math.round(extent * (x * z2 - tx)),
-        Math.round(extent * (y * z2 - ty))];
+        Math.round(extent * (y * z2 - ty)),
+        z];
 }
 
 function createTile(features, z, tx, ty, options) {
@@ -33240,6 +33245,7 @@ function addFeature(tile, feature, tolerance, options) {
         for (var i = 0; i < geom.length; i += 3) {
             simplified.push(geom[i]);
             simplified.push(geom[i + 1]);
+            simplified.push(geom[i + 2]);
             tile.numPoints++;
             tile.numSimplified++;
         }

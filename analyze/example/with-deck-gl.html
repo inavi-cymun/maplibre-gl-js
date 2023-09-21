@@ -26,6 +26,139 @@
       const { LASLoader, load, registerLoaders } = loaders;
       const { Model, GL } = luma;
 
+      class OctreeNode {
+        constructor(min, max) {
+          this.min = min;
+          this.max = max;
+          this.points = [];
+          this.children = null;
+        }
+
+        addPoint(point, maxDepth, currentDepth = 0) {
+          if (currentDepth >= maxDepth) {
+            this.points.push(point);
+            return;
+          }
+
+          if (this.children === null) {
+            this.subdivide();
+          }
+          const childIndex = this.getChildIndex(point);
+          this.children[childIndex].addPoint(point, maxDepth, currentDepth + 1);
+        }
+        getChildIndex(point) {
+          const { min, max } = this;
+          const midX = (min[0] + max[0]) / 2;
+          const midY = (min[1] + max[1]) / 2;
+          const midZ = (min[2] + max[2]) / 2;
+
+          let index = 0;
+          if (point[0] > midX) index |= 1;
+          if (point[1] > midY) index |= 2;
+          if (point[2] > midZ) index |= 4;
+
+          return index;
+        }
+
+        subdivide() {
+          const { min, max } = this;
+          const midX = (min[0] + max[0]) / 2;
+          const midY = (min[1] + max[1]) / 2;
+          const midZ = (min[2] + max[2]) / 2;
+
+          this.children = [
+            new OctreeNode(min, [midX, midY, midZ]),
+            new OctreeNode([midX, min[1], min[2]], [max[0], midY, midZ]),
+            new OctreeNode([min[0], midY, min[2]], [midX, max[1], midZ]),
+            new OctreeNode([midX, midY, min[2]], [max[0], max[1], midZ]),
+            new OctreeNode([min[0], min[1], midZ], [midX, midY, max[2]]),
+            new OctreeNode([midX, min[1], midZ], [max[0], midY, max[2]]),
+            new OctreeNode([min[0], midY, midZ], [midX, max[1], max[2]]),
+            new OctreeNode([midX, midY, midZ], max),
+          ];
+        }
+      }
+
+      class Octree {
+        constructor(min, max, maxDepth = 8) {
+          this.root = new OctreeNode(min, max);
+          this.maxDepth = maxDepth;
+        }
+
+        addPoint(point) {
+          this.root.addPoint(point, this.maxDepth);
+        }
+
+        _addPoint(node, point, depth) {
+          if (depth === this.maxDepth) {
+            node.addPoint(point);
+            return;
+          }
+          if (node.children === null) {
+            node.subdivide();
+          }
+
+          const childIndex = this.getChildIndex(node, point);
+          this._addPoint(node.children[childIndex], point, depth + 1);
+        }
+
+        getChildIndex(node, point) {
+          const { min, max } = node;
+          const midX = (min[0] + max[0]) / 2;
+          const midY = (min[1] + max[1]) / 2;
+          const midZ = (min[2] + max[2]) / 2;
+
+          const xIndex = point[0] > midX ? 1 : 0;
+          const yIndex = point[1] > midY ? 1 : 0;
+          const zIndex = point[2] > midZ ? 1 : 0;
+
+          return xIndex * 4 + yIndex * 2 + zIndex;
+        }
+
+        getVisibleNodes(viewport) {
+          const nodes = [];
+          this._getVisibleNodes(this.root, viewport, nodes);
+          return nodes;
+        }
+
+        _getVisibleNodes(node, viewport, nodes) {
+          if (boxIntersectsBox(node.min, node.max, viewport.min, viewport.max)) {
+            nodes.push(node);
+            if (node.children !== null) {
+              for (const child of node.children) {
+                this._getVisibleNodes(child, viewport, nodes);
+              }
+            }
+          }
+        }
+
+        getPointsInNodes(nodes) {
+          const points = [];
+          for (const node of nodes) {
+            points.push(...node.points);
+          }
+          return points;
+        }
+      }
+
+      function boxIntersectsBox(min1, max1, min2, max2) {
+        for (let i = 0; i < 3; i++) {
+          if (max1[i] < min2[i] || min1[i] > max2[i]) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function pointInBox(point, box) {
+        for (let i = 0; i < 3; i++) {
+          if (point[i] < box.min[i] || point[i] > box.max[i]) {
+            return false;
+          }
+        }
+        return true;
+      }
+
       /** An absolutely minimal primitive layer */
       const vs = `\
 #define SHADER_NAME point-cloud-layer-vertex-shader
@@ -59,6 +192,22 @@ void main(void) {
 }
 `;
 
+        // 데이터를 작은 청크로 나누어 처리
+        async function updateOctreeInChunks(data, octree, chunkSize = 1000) {
+          let i = 0;
+          while (i < data.length) {
+            const chunkEnd = Math.min(i + chunkSize, data.length);
+            for (; i < chunkEnd; i++) {
+              const x = data.attributes.getPosition.value[i * 3];
+              const y = data.attributes.getPosition.value[i * 3 + 1];
+              const z = data.attributes.getPosition.value[i * 3 + 2];
+              const position = [x, y, z];
+              octree.addPoint(position);
+            }
+            await new Promise(resolve => setTimeout(resolve, 0));  // 이벤트 루프를 언블록
+          }
+        }
+
       class MyPointCloudLayer extends Layer {
         static layerName = 'PointCloudLayer';
         static defaultProps = {
@@ -82,12 +231,39 @@ void main(void) {
               defaultValue: [0, 0, 0, 255],
             },
           });
+          this.octree = new Octree([-10000, -10000, -10000], [10000, 10000, 10000]);
 
           this.state.model = this._getModel(this.context.gl);
         }
 
+
+
+        updateState({ props, oldProps, changeFlags }) {
+          if (changeFlags.dataChanged) {
+            updateOctreeInChunks(props.data, this.octree);
+          }
+        }
+
         draw({ uniforms }) {
           const { pointSize } = this.props;
+
+          // 시야 내의 옥트리 노드와 해당 노드에 속한 포인트 검색
+          // Compute the visible nodes and points here.
+          const viewport = { min: [-1000, -1000, -1000], max: [1000, 1000, 1000] }; // Placeholder
+          const visibleNodes = this.octree.getVisibleNodes(viewport);
+          const visiblePoints = this.octree.getPointsInNodes(visibleNodes);
+
+          // 여기서 visiblePoints를 이용해 instancePositions 속성을 업데이트
+          const instancePositions = new Float64Array(visiblePoints.length * 3);
+          for (let i = 0; i < visiblePoints.length; ++i) {
+            instancePositions.set(visiblePoints[i], i * 3);
+          }
+
+          this.getAttributeManager().update({
+            attributes: {
+              instancePositions: instancePositions,
+            },
+          });
 
           this.state.model
             .setUniforms(uniforms)
@@ -148,13 +324,13 @@ void main(void) {
 
           let ply_pointcloud = new MapboxLayer({
             id: 'deckgl-PointCloudLayer',
-            type: MyPointCloudLayer,
+            type: PointCloudLayer,
             data: pointData,
             coordinateOrigin: [127.1068385, 37.4021746, -19],
             coordinateSystem: COORDINATE_SYSTEM.METER_OFFSETS,
-            opacity: 1,
+            opacity: 0.8,
             loaders: [LASLoader],
-            pointSize: 2,
+            pointSize: 1,
             material: false,
           });
 

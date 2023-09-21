@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MapLibre GL JS and LAS Data Example</title>
+    <script src="http://127.0.0.1:9966/dist/maplibre-gl-dev.js"></script>
+    <link href="../../dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/deck.gl@8.9.29/dist.min.js"></script>
+    <script src="https://unpkg.com/@loaders.gl/las@^3.4.14/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/browse/@loaders.gl/core@3.4.14/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/@luma.gl/constants@8.5.21/dist/dist.min.js"></script>
+
+    <style>
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script>
+      const { MapboxLayer, Layer, PointCloudLayer, COORDINATE_SYSTEM } = deck;
+      const { LASLoader, load, registerLoaders } = loaders;
+      const { Model, GL } = luma;
+
+      /** An absolutely minimal primitive layer */
+      const vs = `\
+#define SHADER_NAME point-cloud-layer-vertex-shader
+
+attribute vec4 instanceColors;
+attribute vec3 instancePositions;
+attribute vec3 instancePositions64Low;
+
+uniform float opacity;
+uniform float pointSize;
+
+varying vec4 vColor;
+
+void main(void) {
+  vec3 positionCommon = project_position(instancePositions, instancePositions64Low);
+  gl_Position = project_common_position_to_clipspace(vec4(positionCommon, 1.0));
+  gl_PointSize = pointSize;
+  vColor = vec4(instanceColors.rgb, instanceColors.a * opacity);
+}
+`;
+
+      const fs = `\
+#define SHADER_NAME point-cloud-layer-fragment-shader
+
+precision highp float;
+
+varying vec4 vColor;
+
+void main(void) {
+  gl_FragColor = vColor;
+}
+`;
+
+      class MyPointCloudLayer extends Layer {
+        static layerName = 'PointCloudLayer';
+        static defaultProps = {
+          pointSize: { type: 'number', min: 0 },
+          getPosition: { type: 'accessor', value: (x) => x.position },
+          getColor: { type: 'accessor', value: [0, 0, 0, 255] },
+        };
+
+        initializeState() {
+          this.getAttributeManager().addInstanced({
+            instancePositions: {
+              size: 3,
+              type: GL.DOUBLE,
+              accessor: 'getPosition',
+            },
+            instanceColors: {
+              size: 4,
+              type: GL.UNSIGNED_BYTE,
+              normalized: true,
+              accessor: 'getColor',
+              defaultValue: [0, 0, 0, 255],
+            },
+          });
+
+          this.state.model = this._getModel(this.context.gl);
+        }
+
+        draw({ uniforms }) {
+          const { pointSize } = this.props;
+
+          this.state.model
+            .setUniforms(uniforms)
+            .setUniforms({
+              pointSize,
+            })
+            .draw();
+        }
+
+        _getModel(gl) {
+          return new Model(gl, {
+            id: this.props.id,
+            vs,
+            fs,
+            drawMode: GL.POINTS,
+            vertexCount: 1,
+            instanced: true,
+          });
+        }
+      }
+
+      registerLoaders(LASLoader);
+
+      const LAS_SAMPLE = '../data/output_127.1068385-37.4021746.las';
+
+      let pointData = null;
+
+      function convertLoadersMeshToDeckPointCloudData(vertexCount, attributes) {
+        const pointFloat64Array = new Float64Array(vertexCount * 3);
+        const originalArray = new Int8Array(vertexCount * 3);
+        for (let i = 0; i < vertexCount; i++) {
+          const intensity = attributes.intensity.value[i];
+          originalArray[i * 3] = intensity;
+          originalArray[i * 3 + 1] = intensity;
+          originalArray[i * 3 + 2] = intensity;
+          pointFloat64Array[i * 3] = attributes.POSITION.value[i * 3];
+          pointFloat64Array[i * 3 + 1] = attributes.POSITION.value[i * 3 + 1];
+          pointFloat64Array[i * 3 + 2] = attributes.POSITION.value[i * 3 + 2];
+        }
+
+        const deckAttributes = {};
+        deckAttributes.getColor = { size: 3, value: originalArray };
+        deckAttributes.getPosition = attributes.POSITION;
+        //deckAttributes.getPosition = {size:3,value:pointFloat64Array};
+        //deckAttributes.getNormal = {value: [0, 0, 1], constant: true}
+        // Check PointCloudLayer docs for other supported props?
+        return {
+          length: attributes.POSITION.value.length / attributes.POSITION.size,
+          attributes: deckAttributes,
+        };
+      }
+
+      function _onLoad({ header, loaderData, attributes, progress }) {
+        console.log(header);
+
+        if (pointData == null) {
+          pointData = convertLoadersMeshToDeckPointCloudData(header.vertexCount, attributes);
+
+          let ply_pointcloud = new MapboxLayer({
+            id: 'deckgl-PointCloudLayer',
+            type: MyPointCloudLayer,
+            data: pointData,
+            coordinateOrigin: [127.1068385, 37.4021746, -19],
+            coordinateSystem: COORDINATE_SYSTEM.METER_OFFSETS,
+            opacity: 1,
+            loaders: [LASLoader],
+            pointSize: 2,
+            material: false,
+          });
+
+          map.addLayer(ply_pointcloud);
+          map.showTileBoundaries = false;
+        }
+
+        console.log('loaded');
+      }
+
+      // Initialize MapLibre GL JS map
+      let hoveredStateId = null;
+      const map = new maplibregl.Map({
+        container: 'map',
+        zoom: 18,
+        center: [127.1104411, 37.4020702],
+        pitch: 52,
+        hash: true,
+        style: {
+          version: 8,
+          sources: {
+            osm: {
+              type: 'raster',
+              tiles: [
+                'http://61.33.249.243:25004/maps/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=InaviSatellite&STYLE=default&FORMAT=image/png&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+              ],
+              tileSize: 256,
+              maxzoom: 17,
+            },
+            // Use a different source for terrain and hillshade layers, to improve render quality
+            terrainSource: {
+              type: 'raster-dem',
+              url: 'http://10.10.82.42:24003/mapbox_mvt/2304/tile.json',
+              tileSize: 256,
+            },
+            hillshadeSource: {
+              type: 'raster-dem',
+              url: 'http://10.10.82.42:24003/mapbox_mvt/2304/tile.json',
+              tileSize: 256,
+            },
+          },
+          layers: [
+            {
+              id: 'osm',
+              type: 'raster',
+              source: 'osm',
+            },
+          ],
+          terrain: {
+            source: 'terrainSource',
+            exaggeration: 1,
+          },
+        },
+        maxZoom: 25,
+        maxPitch: 85,
+      });
+
+      map.on('load', function () {
+        map.showTileBoundaries = true;
+
+        load(LAS_SAMPLE).then(_onLoad.bind(this));
+      });
+    </script>
+  </body>
+</html>

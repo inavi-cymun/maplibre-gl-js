@@ -5,7 +5,7 @@ import rewind from '@mapbox/geojson-rewind';
 import {GeoJSONWrapper} from './geojson_wrapper';
 import vtpbf from 'vt-pbf';
 import Supercluster, {type Options, type ClusterProperties} from 'supercluster';
-import GeoJSONVT from '../util/geojson3d-vt';
+import geojsonvt from 'geojson-vt';
 import {VectorTileWorkerSource} from './vector_tile_worker_source';
 import {createExpression} from '@maplibre/maplibre-gl-style-spec';
 
@@ -92,7 +92,7 @@ export class GeoJSONWorkerSource extends VectorTileWorkerSource {
         abandoned?: boolean;
     }>;
     _pendingRequest: Cancelable;
-    _geoJSONIndex: any;
+    _geoJSONIndex: GeoJSONIndex;
     _dataUpdateable = new Map<GeoJSONFeatureId, GeoJSON.Feature>();
 
     /**
@@ -159,7 +159,7 @@ export class GeoJSONWorkerSource extends VectorTileWorkerSource {
 
                     this._geoJSONIndex = params.cluster ?
                         new Supercluster(getSuperclusterOptions(params)).load(data.features) :
-                        new GeoJSONVT(data, params.geojsonVtOptions);
+                        geojsonvt(data, params.geojsonVtOptions);
                 } catch (err) {
                     return callback(err);
                 }

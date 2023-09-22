@@ -5,18 +5,26 @@ import type {VectorTileFeature, VectorTileLayer, VectorTile} from '@mapbox/vecto
 const toGeoJSON = mvt.VectorTileFeature.prototype.toGeoJSON;
 import {EXTENT} from '../data/extent';
 
+export class Point3D extends Point {
+    z: number;
+    constructor(x: number, y: number, z:number) {
+        super(x, y);
+        this.z = z;
+    }
+}
+
 // The feature type used by geojson-vt and supercluster. Should be extracted to
 // global type and used in module definitions for those two modules.
 export type Feature = {
     type: 1;
     id: any;
     tags: {[_: string]: string | number | boolean};
-    geometry: Array<[number, number]>;
+    geometry: Array<[number, number]|[number, number, number]>;
 } | {
     type: 2 | 3;
     id: any;
     tags: {[_: string]: string | number | boolean};
-    geometry: Array<Array<[number, number]>>;
+    geometry: Array<Array<[number, number]|[number, number, number]>>;
 };
 
 class FeatureWrapper implements VectorTileFeature {
@@ -49,7 +57,12 @@ class FeatureWrapper implements VectorTileFeature {
         if (this._feature.type === 1) {
             const geometry = [];
             for (const point of this._feature.geometry) {
-                geometry.push([new Point(point[0], point[1])]);
+                if (point.length > 2) {
+                    geometry.push([new Point3D(point[0], point[1], point[2])]);
+                } else {
+                    geometry.push([new Point(point[0], point[1])]);
+                }
+
             }
             return geometry;
         } else {
@@ -57,7 +70,11 @@ class FeatureWrapper implements VectorTileFeature {
             for (const ring of this._feature.geometry) {
                 const newRing = [];
                 for (const point of ring) {
-                    newRing.push(new Point(point[0], point[1]));
+                    if (point.length > 2) {
+                        newRing.push(new Point3D(point[0], point[1], point[2]));
+                    } else {
+                        newRing.push(new Point(point[0], point[1]));
+                    }
                 }
                 geometry.push(newRing);
             }

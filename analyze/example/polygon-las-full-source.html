@@ -19,7 +19,6 @@
 
     <script>
       proj4.defs('EPSG:32652', '+proj=utm +zone=52 +ellps=WGS84 +datum=WGS84 +units=m +no_defs ');
-      let start = 0;
 
       const map = new maplibregl.Map({
         container: 'map',
@@ -64,9 +63,10 @@
         maxPitch: 85,
       });
       let response = null;
-      let arrayBuffer = null
+      let arrayBuffer = null;
+      let start = 0;
 
-      async function loadLASData(lengthOfLayer) {
+      async function loadLASData(lengthOfLayer,start) {
         if(response ==null && arrayBuffer==null){
           console.time('get');
           response = await fetch('../data/output.las');
@@ -102,8 +102,8 @@
         const zOffset = dataView.getFloat64(171, true);
         const maxX = dataView.getFloat64(179, true);
         const minX = dataView.getFloat64(187, true);
-        const maxY = dataView.getFloat64(203, true);
-        const minY = dataView.getFloat64(195, true);
+        const maxY = dataView.getFloat64(195, true);
+        const minY = dataView.getFloat64(203, true);
         const maxZ = dataView.getFloat64(211, true);
         const minZ = dataView.getFloat64(219, true);
         console.timeEnd('parseHeader');
@@ -147,30 +147,15 @@
           }
         } catch (e) {
           console.log(e);
-        }
-        start += 1;
-        console.timeEnd('parse');
-
-        return featuresArray;
-      }
-
-      map.on('load', function () {
-        map.showTileBoundaries=true
-      });
-      map.on('idle', (e) => {
-        console.log('idle')
-        if(start<10){
-          console.log(start*100000)
-          loadLASData(start+1,start).then((lasData) => {
-            for (let i = 0; i < 1; i++) {
-              map.addLayer({
-                id: `polygon-data${start+i}`,
+        }              
+        map.addLayer({
+                id: `polygon-data${start}`,
                 type: 'fill-extrusion',
                 source: {
                   type: 'geojson',
                   data: {
                     type: 'FeatureCollection',
-                    features: lasData[i],
+                    features: featuresArray[0],
                   },
                 },
                 paint: {
@@ -182,7 +167,19 @@
                   'fill-extrusion-vertical-gradient' : false, //default true
                 },
               });
-            }
+        console.timeEnd('parse');
+
+      }
+
+      map.on('load', function () {
+        map.showTileBoundaries=true
+      });
+      map.on('idle', function () {
+        console.log('idle')
+        if(start<10){
+          loadLASData(start+1, start).then(()=>{
+            //map.getSource(`polygon-data${start}`).onRemove()
+            start += 1;  
           });
         }
       });

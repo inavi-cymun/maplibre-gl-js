@@ -17,6 +17,7 @@
     <div id="map"></div>
 
     <script>
+      let hoveredStateId = null;
       // Initialize MapLibre GL JS map
       const map = new maplibregl.Map({
         container: 'map',
@@ -67,6 +68,28 @@
             z_base: 30,
             color: 'gray',
           },
+          id:1
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [127.1098, 37.3858],
+                [127.1098, 37.3859],
+                [127.10992, 37.3859],
+                [127.10992, 37.3858],
+                [127.1098, 37.3858],
+              ],
+            ],
+          },
+          properties: {
+            z_top: 70,
+            z_base: 60,
+            color: 'gray',
+          },
+          id:2
         }
       ];
 
@@ -74,25 +97,60 @@
         map.showTileBoundaries=true
         //map.showOverdrawInspector=true
         map.showCollisionBoxes=true
-        map.addLayer({
-          id: 'polygon-data',
-          type: 'fill-extrusion',
-          source: {
+
+        map.addSource('samhwan', {
             type: 'geojson',
             data: {
               type: 'FeatureCollection',
-              features: features, //generateRandomPointArray(1)
+              features: features
             },
-          },
+          });
+        map.addLayer({
+          id: 'polygon-data',
+          type: 'fill-extrusion',
+          source: 'samhwan',
           paint: {
-            'fill-extrusion-color': ['get', 'color'],
+            'fill-extrusion-color': ['case',
+                    ['boolean', ['feature-state', 'hover'], false],
+                    'red',
+                    'blue'],
 
             'fill-extrusion-height': ['get', 'z_top'],
 
             'fill-extrusion-base': ['get', 'z_base'],
 
-            'fill-extrusion-opacity': 0.5,
+            'fill-extrusion-opacity': 1,
           },
+        });
+
+
+        map.on('mousemove', 'polygon-data', (e) => {
+            if (e.features.length > 0) {
+              //debugger;
+                if (hoveredStateId) {
+                    map.setFeatureState(
+                        {source: 'samhwan', id: hoveredStateId},
+                        {hover: false}
+                    );
+                }
+                hoveredStateId = e.features[0].id;
+                map.setFeatureState(
+                    {source: 'samhwan', id: hoveredStateId},
+                    {hover: true}
+                );
+            }
+        });
+
+        // When the mouse leaves the state-fill layer, update the feature state of the
+        // previously hovered feature.
+        map.on('mouseleave', 'polygon-data', () => {
+            if (hoveredStateId) {
+                map.setFeatureState(
+                    {source: 'samhwan', id: hoveredStateId},
+                    {hover: false}
+                );
+            }
+            hoveredStateId = null;
         });
       });
     </script>

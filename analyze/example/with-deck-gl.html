@@ -148,9 +148,9 @@ void main(void) {
 
           let ply_pointcloud = new MapboxLayer({
             id: 'deckgl-PointCloudLayer',
-            type: MyPointCloudLayer,
+            type: PointCloudLayer,
             data: pointData,
-            coordinateOrigin: [127.1068385, 37.4021746, -19],
+            coordinateOrigin: [127.1068385, 37.4021746, 0],
             coordinateSystem: COORDINATE_SYSTEM.METER_OFFSETS,
             opacity: 1,
             loaders: [LASLoader],

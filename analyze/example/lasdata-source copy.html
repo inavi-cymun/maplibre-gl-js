@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MapLibre GL JS and LAS Data Example</title>
+    <script src="https://unpkg.com/maplibre-gl@1.15.2/dist/maplibre-gl.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.min.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@1.15.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script>
+      proj4.defs('EPSG:2992','+proj=lcc +lat_0=41.75 +lon_0=-120.5 +lat_1=43 +lat_2=45.5 +x_0=399999.9999984 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=ft +no_defs');
+      // Initialize MapLibre GL JS map
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://demotiles.maplibre.org/style.json', // style URL
+        center: [-123.068053,44.056453], // starting position [lng, lat]
+        zoom: 1, // starting zoom
+      });
+
+      // Load LAS data (replace with your own LAS data loading logic)
+      async function loadLASData() {
+        //const response = await fetch('../../ChiAk_Seg.las');
+        const response = await fetch('../autzen-classified.laz');
+        const arrayBuffer = await response.arrayBuffer();
+        const dataView = new DataView(arrayBuffer);
+
+        // Parse LAS header (replace with your own logic)
+        const header = {
+          // Example: read the first 4 bytes as a string (LAS file signature)
+          fileSignature: String.fromCharCode.apply(null, new Uint8Array(arrayBuffer, 0, 4)),
+        };
+
+        // Parse LAS header to get version
+        const majorVersion = dataView.getUint8(24);
+        const minorVersion = dataView.getUint8(25);
+        const version = `${majorVersion}.${minorVersion}`;
+        console.log(`${version}`);
+
+        // Parse LAS points (replace with your own logic)
+        const points = [];
+        const offset = dataView.getUint32(96, true); // Example offset to start reading points
+        const pointSize = dataView.getUint16(105, true);
+        const legacyNumberOfPointRecords = dataView.getUint32(107, true);
+        const numberOfPointsByReturn = [];
+        for (let i = 0; i < 5; i++) {
+          numberOfPointsByReturn.push(dataView.getUint32(111 + i * 4, true));
+        }
+        const xScaleFactor = dataView.getFloat64(131, true);
+        const yScaleFactor = dataView.getFloat64(139, true);
+        const zScaleFactor = dataView.getFloat64(147, true);
+        const xOffset = dataView.getFloat64(155, true);
+        const yOffset = dataView.getFloat64(163, true);
+        const zOffset = dataView.getFloat64(171, true);
+        const maxX = dataView.getFloat64(179, true);
+        const maxY = dataView.getFloat64(187, true);
+        const maxZ = dataView.getFloat64(195, true);
+        const minX = dataView.getFloat64(203, true);
+        const minY = dataView.getFloat64(211, true);
+        const minZ = dataView.getFloat64(219, true);
+        try {
+          for (let i = 0; i < 1000; i++) {
+            // Read only 10 points for this example
+            const x = xOffset +  xScaleFactor * dataView.getFloat64(offset + i * pointSize, true);
+            const y = yOffset +  yScaleFactor * dataView.getFloat64(offset + i * pointSize + 8, true);
+            const z = zOffset +  zScaleFactor * dataView.getFloat64(offset + i * pointSize + 16, true);
+            points.push([ x.toFixed(2), y.toFixed(2), z.toFixed(2) ]);
+          }
+        } catch (e) {
+          console.log(e);
+        }
+
+        return { header, points };
+      }
+
+      // Add custom layer for LAS data
+      map.on('load', function () {
+        loadLASData().then((lasData) => {
+            const {header,points} = lasData;
+            const features = points.map((point, index) => {
+                let coord = [0,0]  
+                try{
+                  if(point[0]||point[1]){
+                  coord = proj4(proj4('EPSG:2992'),proj4('EPSG:4326'),[point[0], point[1]])
+                }
+                }catch(e){console.log(e)}
+              
+                const geojson =   {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'Point',
+                    coordinates: coord
+                  },
+                  properties: {
+                    id: index,
+                    elevation: point[2],
+                  },
+                }
+                return geojson});
+            map.addSource('las', {type: 'geojson', data: {type: 'FeatureCollection', features: features}, attribution: 'World'});
+          map.addLayer({
+            id: 'las-points',
+            type: 'circle',
+            source: 'las',
+            paint: {
+              'circle-radius': 10,
+              'circle-color': ['get', 'elevation'],
+            },
+          });
+        });
+      });
+      /*
+Name		Type		Byte
+File Signature (“LASF”) 	,	char[4] 	,	4
+File Source ID 	,	unsigned short 	,	2
+Global Encoding 	,	unsigned short 	,	2
+Project ID - GUID Data 1 	,	unsigned long 	,	4
+Project ID - GUID Data 2 	,	unsigned short 	,	2
+Project ID - GUID Data 3 	,	unsigned short 	,	2
+Project ID - GUID Data 4 	,	unsigned char[8] 	,	8
+Version Major 	,	unsigned char 	,	1
+Version Minor 	,	unsigned char 	,	1
+System Identifier 	,	char[32] 	,	32
+Generating Software 	,	char[32] 	,	32
+File Creation Day of Year 	,	unsigned short 	,	2
+File Creation Year 	,	unsigned short 	,	2
+Header Size 	,	unsigned short 	,	2
+Offset to Point Data 	,	unsigned long 	,	4
+Number of Variable Length Records 	,	unsigned long 	,	4
+Point Data Record Format 	,	unsigned char 	,	1
+Point Data Record Length 	,	unsigned short 	,	2
+Legacy Number of Point Records 	,	unsigned long 	,	4
+Legacy Number of Point by Return 	,	unsigned long[5]	,	20
+X Scale Factor  	,	double 	,	8
+Y Scale Factor  	,	double 	,	8
+Z Scale Factor  	,	double 	,	8
+X Offset  	,	 double 	,	8
+Y Offset  	,	 double 	,	8
+Z Offset  	,	 double 	,	8
+Max X  	,	double 	,	8
+Max Y  	,	double 	,	8
+Max Z  	,	double 	,	8
+Min X  	,	double 	,	8
+Min Y  	,	double 	,	8
+Min Z  	,	double 	,	8
+Start of Waveform Data Packet Record 	,	unsigned long long 	,	8
+Start of First Extended Variable Length Record 	,	unsigned long long 	,	8
+Number of Extended Variable Length Records 	,	unsigned long 	,	4
+
+  
+  */
+    </script>
+  </body>
+</html>

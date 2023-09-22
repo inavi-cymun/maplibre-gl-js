@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MapLibre GL JS and LAS Data Example</title>
+    <script src="http://127.0.0.1:9966/dist/maplibre-gl-dev.js"></script>
+    <link href="../../dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script>
+      // Initialize MapLibre GL JS map
+      const map = new maplibregl.Map({
+        container: 'map',
+        zoom: 18,
+        center: [127.1104411, 37.4020702],
+        pitch: 52,
+        hash: true,
+        style: {
+          version: 8,
+          sources: {
+            osm: {
+              type: 'raster',
+              tiles: [
+                'http://61.33.249.243:25004/maps/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=InaviSatellite&STYLE=default&FORMAT=image/png&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+              ],
+              tileSize: 256,
+              maxzoom: 17,
+            },
+            // Use a different source for terrain and hillshade layers, to improve render quality
+            terrainSource: {
+              type: 'raster-dem',
+              url: 'http://10.10.82.42:24003/mapbox_mvt/2304/tile.json',
+              tileSize: 256,
+            },
+            hillshadeSource: {
+              type: 'raster-dem',
+              url: 'http://10.10.82.42:24003/mapbox_mvt/2304/tile.json',
+              tileSize: 256,
+            },
+          },
+          layers: [
+            {
+              id: 'osm',
+              type: 'raster',
+              source: 'osm',
+            },
+          ],
+          terrain: {
+            source: 'terrainSource',
+            exaggeration: 0,
+          },
+        },
+        maxZoom: 25,
+        maxPitch: 85,
+      });
+
+      map.on('load', function () {
+        map.showTileBoundaries = true;
+        map.addLayer({
+          id: 'samhwan',
+          type: 'circle',
+          source: {
+            type: 'vector',
+            tiles: ["http://localhost:9966/analyze/data/vt/{z}/{x}/{y}.pbf"],
+            maxzoom: 18
+          },
+          "source-layer" : 'samhwan',
+          paint: {
+            'circle-opacity': 1,
+            'circle-color': 'red',
+            'circle-radius': 5,
+          },
+        });
+      });
+    </script>
+  </body>
+</html>

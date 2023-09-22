@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MapLibre GL JS and LAS Data Example</title>
+    <script src="http://127.0.0.1:9966/dist/maplibre-gl-dev-before.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.min.js"></script>
+    <link href="../../dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script>
+      proj4.defs('EPSG:32652', '+proj=utm +zone=52 +ellps=WGS84 +datum=WGS84 +units=m +no_defs ');
+      // Initialize MapLibre GL JS map
+      const map = new maplibregl.Map({
+        container: 'map',
+        zoom: 18,
+        center: [127.1104411, 37.4020702],
+        pitch: 52,
+        hash: true,
+        style: {
+          version: 8,
+          sources: {
+            osm: {
+              type: 'raster',
+              tiles: [
+                'http://61.33.249.243:25004/maps/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=InaviSatellite&STYLE=default&FORMAT=image/png&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+              ],
+              tileSize: 256,
+              maxzoom: 17,
+            },
+            // Use a different source for terrain and hillshade layers, to improve render quality
+            terrainSource: {
+              type: 'raster-dem',
+              url: 'http://10.10.82.42:24003/mapbox_mvt/2304/tile.json',
+              tileSize: 256,
+            },
+            hillshadeSource: {
+              type: 'raster-dem',
+              url: 'http://10.10.82.42:24003/mapbox_mvt/2304/tile.json',
+              tileSize: 256,
+            },
+          },
+          layers: [
+            {
+              id: 'osm',
+              type: 'raster',
+              source: 'osm',
+            },
+          ],
+          terrain: {
+            source: 'terrainSource',
+            exaggeration: 0,
+          },
+        },
+        maxZoom: 25,
+        maxPitch: 85,
+      });
+
+      let response = null;
+      let arrayBuffer = null;
+      let start = 0;
+
+      async function loadLASData() {
+        if(response ==null && arrayBuffer==null){
+          console.time('get');
+          response = await fetch('../data/output.las');
+          arrayBuffer = await response.arrayBuffer();
+          console.timeEnd('get');
+        }
+        
+        const result = [];
+
+        
+        
+        const dataView = new DataView(arrayBuffer);
+        console.time('parseHeader');
+        const header = {
+          fileSignature: String.fromCharCode.apply(null, new Uint8Array(arrayBuffer, 0, 4)),
+        };
+
+        const majorVersion = dataView.getUint8(24);
+        const minorVersion = dataView.getUint8(25);
+        const version = `${majorVersion}.${minorVersion}`;
+        console.log(`${version}`);
+
+        const featuresArray = [];
+        const offset = dataView.getUint32(96, true);
+        const pointSize = dataView.getUint16(105, true);
+        const pointCounts = 500000//dataView.getUint32(247, true);
+        const xScaleFactor = dataView.getFloat64(131, true);
+        const yScaleFactor = dataView.getFloat64(139, true);
+        const zScaleFactor = dataView.getFloat64(147, true);
+        const xOffset = dataView.getFloat64(155, true);
+        const yOffset = dataView.getFloat64(163, true);
+        const zOffset = dataView.getFloat64(171, true);
+        const maxX = dataView.getFloat64(179, true);
+        const minX = dataView.getFloat64(187, true);
+        const maxY = dataView.getFloat64(195, true);
+        const minY = dataView.getFloat64(203, true);
+        const maxZ = dataView.getFloat64(211, true);
+        const minZ = dataView.getFloat64(219, true);
+        console.timeEnd('parseHeader');
+        const features = [];
+        try {
+            
+            for (let i = 0; i < pointCounts; i++) {
+              const x = xOffset + xScaleFactor * dataView.getUint32(offset + i * pointSize, true);
+              const y = yOffset + yScaleFactor * dataView.getUint32(offset + i * pointSize + 4, true);
+              const z = zOffset + zScaleFactor * dataView.getUint32(offset + i * pointSize + 8, true);
+              const intensity = dataView.getUint16(offset + i * pointSize + 12, true)
+              let color = intensity
+              //if(color>10&&color<185)color += 70;
+              color = color.toString(16).padStart(2,"0");
+              //const coord = proj4(proj4('EPSG:32652'), proj4('EPSG:4326'), [x, y]);
+              const coord = [x,y]
+
+              const feature = {};
+
+              feature.geometry = {};
+              feature.properties = {};
+              feature.type = 'Feature';
+              feature.geometry.type = 'Point';
+              feature.geometry.coordinates = [...coord,z];
+              feature.properties.color = `#${color}${color}${color}`;
+
+              features.push(feature);
+            }
+        } catch (e) {
+          console.log(e);
+        }              
+        map.addLayer({
+                id: `samhwan`,
+                type: 'circle',
+                source: {
+                  type: 'geojson',
+                  data: {
+                    type: 'FeatureCollection',
+                    features: features.slice(0,200000),
+                  },
+                },
+                paint: {
+                  'circle-opacity': 0.8,
+                  'circle-color': ['get', 'color'],
+                  'circle-radius': 1,
+                },
+              });
+              map.addLayer({
+                id: `samhwan2`,
+                type: 'circle',
+                source: {
+                  type: 'geojson',
+                  data: {
+                    type: 'FeatureCollection',
+                    features: features.slice(200001,400000),
+                  },
+                },
+                paint: {
+                  'circle-opacity': 0.8,
+                  'circle-color': ['get', 'color'],
+                  'circle-radius': 1,
+                },
+              });
+              map.addLayer({
+                id: `samhwan3`,
+                type: 'circle',
+                source: {
+                  type: 'geojson',
+                  data: {
+                    type: 'FeatureCollection',
+                    features: features.slice(400001,600000),
+                  },
+                },
+                paint: {
+                  'circle-opacity': 0.8,
+                  'circle-color': ['get', 'color'],
+                  'circle-radius': 1,
+                },
+              });
+
+      }
+
+      map.on('load', function () {
+        map.showTileBoundaries=true
+        loadLASData()
+      });
+      map.on('idle', function () {
+        console.log('idle')
+      });
+    </script>
+  </body>
+</html>

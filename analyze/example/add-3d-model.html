@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Add a 3D model with maplibregl</title>
+    <meta property="og:description" content="Use a custom style layer with maplibregl to add a 3D model to the map." />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel='stylesheet' href='../../dist/maplibre-gl.css' />
+    <script src='../../dist/maplibre-gl-dev.js'></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body, #map { height: 100%; }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+    const map = new maplibregl.Map({
+        container: 'map',
+        style:
+            'https://api.maptiler.com/maps/basic/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL',
+        zoom: 18,
+        center: [148.9819, -35.3981],
+        pitch: 60,
+        antialias: true // create the gl context with MSAA antialiasing, so custom layers are antialiased
+    });
+
+    const modelOrigin = [148.9819, -35.39847];
+    const modelAltitude = 0;
+
+    const modelAsMercatorCoordinate = maplibregl.MercatorCoordinate.fromLngLat(
+        modelOrigin,
+        modelAltitude
+    );
+
+    const modelTransform = {
+        translateX: modelAsMercatorCoordinate.x,
+        translateY: modelAsMercatorCoordinate.y,
+        translateZ: modelAsMercatorCoordinate.z,
+        rotateX: 0,
+        rotateY: 0,
+        rotateZ: 0,
+        scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
+    };
+
+    const customLayer = {
+        id: '3d-model',
+        type: 'custom',
+        renderingMode: '3d',
+        onAdd (map, gl) {
+            this.scene = new THREE.Scene(); // Create a new three.js scene
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff);
+            directionalLight.position.set(0, -70, 100).normalize();
+            this.scene.add(directionalLight);
+
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff);
+            directionalLight2.position.set(0, 70, 100).normalize();
+            this.scene.add(directionalLight2);
+
+            const loader = new THREE.GLTFLoader(); // Use three.js GLTFLoader
+            loader.load(
+                'https://maplibre.org/maplibre-gl-js/docs/assets/34M_17/34M_17.gltf',
+                (gltf) => {
+                    this.scene.add(gltf.scene);
+                }
+            );
+            this.map = map;
+
+            this.renderer = new THREE.WebGLRenderer({
+                canvas: map.getCanvas(),
+                context: gl,
+                antialias: true
+            });
+
+            this.renderer.autoClear = false;
+        },
+        render (gl, matrix) {
+            // ...
+        }
+    };
+
+    map.on('style.load', () => {
+        map.addLayer(customLayer);
+    });
+</script>
+</body>
+</html>

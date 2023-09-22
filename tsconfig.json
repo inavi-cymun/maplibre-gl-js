@@ -39,7 +39,8 @@
     "rollup.config.*",
     "src/**/*",
     "test/bench/**/*",
-    "build/**/*"
+    "build/**/*",
+    "test/app.ts"
   ],
   "exclude": [
     "node_modules",

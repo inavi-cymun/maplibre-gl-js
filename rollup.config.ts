@@ -20,7 +20,7 @@ const config: RollupOptions[] = [{
     output: {
         dir: 'staging/maplibregl',
         format: 'amd',
-        sourcemap: 'inline',
+        sourcemap: true,
         indent: false,
         chunkFileNames: 'shared.js'
     },

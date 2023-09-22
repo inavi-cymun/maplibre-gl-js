@@ -17,6 +17,7 @@
     "jest"
   ],
   "rules": {
+    "linebreak-style": 0,
     "no-dupe-class-members": "off",
     "@typescript-eslint/no-dupe-class-members": ["error"],
     "@typescript-eslint/no-unused-vars": [
